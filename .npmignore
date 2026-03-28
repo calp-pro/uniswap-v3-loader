@@ -1,0 +1,5 @@
+*.csv
+test*.js
+test*.mjs
+lcov.info
+CODE_OF_CONDUCT.md
