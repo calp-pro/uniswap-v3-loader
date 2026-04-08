@@ -1,14 +1,24 @@
-const get_pairs_addresses = (key, factory, ids, abort_signal) => ids.length == 0
+const factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
+const npm = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
+const get_tokens_ids_by_indexes = require('./get_tokens_ids')
+
+const get_pairs = (key, ids, result, abort_signal) => ids.length == 0
     ? Promise.resolve([])
     : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
         signal: abort_signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ids.map((id, i) => ({
+        body: JSON.stringify(Object.keys(ids).map(id => ({
             jsonrpc: '2.0',
-            id: i,
+            id,
             method: 'eth_call',
-            params: [{ to: factory, data: '0x1e3dd18b' + id.toString(16).padStart(64, '0') }, 'latest']
+            params: [{
+                to: factory,
+                data: '0x1698ee82' +
+                    ids[id].token0.slice(2).padStart(64, '0') +
+                    ids[id].token1.slice(2).padStart(64, '0') +
+                    ids[id].fee.toString(16).padStart(64, '0')
+            }, 'latest']
         })))
     }).then(
         _ => {
@@ -20,42 +30,37 @@ const get_pairs_addresses = (key, factory, ids, abort_signal) => ids.length == 0
         }
     )    
     .then(responds => {
-        responds.sort((a, b) => a.id - b.id)
-        const addresses = []
-        const failed_ids = []
-        for (var i = 0; i < responds.length; i++)
-            responds[i].result
-                ? addresses.push('0x' + responds[i].result.slice(-40).toLowerCase())
-                : failed_ids.push(ids[i])
-
-        return failed_ids.length == 0
-            ? addresses
+        const failed_ids = {}
+        responds.forEach(respond =>
+            respond.result
+                ? result[respond.id] = '0x' + respond.result.slice(2).slice(24)
+                : failed_ids[respond.id] = ids[respond.id]
+        )
+        return Object.keys(failed_ids).length == 0
+            ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_pairs_addresses(key, factory, failed_ids, abort_signal).then(retried => [...addresses, ...retried])
+                get_pairs(key, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs_addresses(key, factory, ids, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs(key, ids, result, abort_signal)), 10000)))
 
-const get_tokens = (key, addresses, abort_signal) => addresses.length == 0
-    ? Promise.resolve({})
+const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
+    ? Promise.resolve(result)
     : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
         signal: abort_signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addresses.flatMap((address, i) => [
-            {
-                jsonrpc: '2.0',
-                id: i * 2,
-                method: 'eth_call',
-                params: [{ to: address, data: '0x0dfe1681' }, 'latest']
-            },
-            {
-                jsonrpc: '2.0',
-                id: i * 2 + 1,
-                method: 'eth_call',
-                params: [{ to: address, data: '0xd21220a7' }, 'latest']
-            }
-        ]))
+        body: JSON.stringify(
+            ids.map(id => ({
+                jsonrpc:'2.0',
+                id,
+                method:'eth_call',
+                params: [{
+                    to: npm,
+                    data: '0x99fbab88' + id.toString(16).padStart(64,'0')
+                }, 'latest']
+            }))
+        )
     }).then(
         _ => {
             if (_.ok) return _.json()
@@ -65,46 +70,46 @@ const get_tokens = (key, addresses, abort_signal) => addresses.length == 0
             throw _.cause?.message
         }
     ).then(responds => {
-        responds.sort((a, b) => a.id - b.id)
-        const tokens = {}
-        const failed_addresses = []
+        const failed_ids = []
 
-        for (var i = 0; i < addresses.length; i++) {
-            const token0_respond = responds[i * 2]
-            const token1_respond = responds[i * 2 + 1]
-
-            if (token0_respond.result && token1_respond.result)
-                tokens[addresses[i]] = [
-                    '0x' + token0_respond.result.slice(-40).toLowerCase(),
-                    '0x' + token1_respond.result.slice(-40).toLowerCase()
-                ]
+        for (var i = 0; i < responds.length; i++) {
+            var respond = responds[i]
+            if (respond.result)
+                result[respond.id] = {
+                    token0: '0x' + respond.result.slice(2 + 64 * 2, 2 + 64 * 3).slice(24),
+                    token1: '0x' + respond.result.slice(2 + 64 * 3, 2 + 64 * 4).slice(24),
+                    fee: Number('0x' + respond.result.slice(2 + 64 * 4, 2 + 64 * 5))
+                }
             else
-                failed_addresses.push(addresses[i])
+                failed_ids.push(respond.id)
         }
 
-        return failed_addresses.length == 0
-            ? tokens
+        return failed_ids.length == 0
+            ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_tokens(key, failed_addresses, abort_signal).then(retried => ({ ...tokens, ...retried }))
+                get_tokens_ids(key, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens(key, addresses, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens_ids(key, ids, result, abort_signal)), 10000)))
 
-const main = ({ids, factory, key, multicall_size, abort_signal}, onpair) => {
+const main = ({ids: indexes, key, multicall_size, abort_signal}, onpair) => {
     const chunks = []
-    for (let i = 0; i < ids.length; i += multicall_size)
-        chunks.push(ids.slice(i, i + multicall_size))
+    for (let i = 0; i < indexes.length; i += multicall_size)
+        chunks.push(indexes.slice(i, i + multicall_size))
 
-    return chunks.reduce((p, ids, ic) =>
+    return chunks.reduce((p, indexes, ic) =>
         p.then(() =>
-            get_pairs_addresses(key, factory, ids, abort_signal).then(pairs_addresses =>
-                get_tokens(key, pairs_addresses, abort_signal).then(tokens =>
-                    ids.forEach((id, i) =>
-                        onpair({
-                            id,
-                            pair: pairs_addresses[i],
-                            token0: tokens[pairs_addresses[i]][0],
-                            token1: tokens[pairs_addresses[i]][1]
+            get_tokens_ids_by_indexes(indexes).then(tokens_ids =>
+                get_tokens(key, tokens_ids, {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
+                    get_pairs(key, tokens, {}, abort_signal).then(pairs =>
+                        indexes.forEach(index => {
+                            var id = tokens_ids[index]
+                            onpair({
+                                id: index,
+                                pair: pairs[id],
+                                token0: tokens[id].token0,
+                                token1: tokens[id].token1
+                            })
                         })
                     )
                 )

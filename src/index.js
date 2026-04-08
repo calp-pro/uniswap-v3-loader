@@ -5,8 +5,7 @@ const path = require('path')
 const default_cache_filename = require('./default_cache_filename')
 const dex_db = require('@calp-pro/dex-db')
 const max_workers = os.cpus().length - 1
-const debug_key = process.env.KEY || 'FZBvlPrOxtgaKBBkry3SH0W1IqH4Y5tu'
-const uniswap_v3_factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
+const debug_key = process.env.KEY || 'euEV_WdPWxmaSWLlGyKr9'
 
 const load = (params = {}) => {
     var {
@@ -86,7 +85,7 @@ const load = (params = {}) => {
                 jsonrpc: '2.0',
                 id: 1,
                 method: 'eth_call',
-                params: [{ to: uniswap_v3_factory, data: '0x574f2ba3' }, 'latest']
+                params: [{ to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88', data: '0x18160ddd' }, 'latest']
             })
         }).then(
             _ => {
@@ -141,7 +140,7 @@ const load = (params = {}) => {
             const ids = []
             for (var i = start_loading_from; i <= last_id; i++)
                 ids.push(i)
-            return require('./loader')({ ids, factory: uniswap_v3_factory, key, multicall_size, abort_signal }, onpair)
+            return require('./loader')({ ids, key, multicall_size, abort_signal }, onpair)
             .then(() => {
                 if (from && to) return pairs.filter(({id}) => id >= from && id <= to)
                 if (from) return pairs.filter(({id}) => id >= from)
