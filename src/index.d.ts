@@ -16,14 +16,12 @@ export interface pair {
  * Parameters for the load function.
  */
 export interface load_params {
-  /** Alchemy/Infura API key. */
+  /** Alchemy API key. */
   key?: string
   /** The address of a Uniswap V3 factory. */
   factory?: string
   /** Path to the cache file. Set to null to disable caching. */
   filename?: string | null
-  /** Switch cache between CSV and binary mode. */
-  csv?: boolean
   /** Number of pairs to fetch in a single multicall. */
   multicall_size?: number
   /** Start loading from this index. */

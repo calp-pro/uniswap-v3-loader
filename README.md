@@ -43,16 +43,12 @@ Methods:
   * Type: `number`
   * Default: `undefined`
 - `filename`
-  * Cache path. Used for pre-load data and add updates. In case `csv` set to `false` value used as prefix for:
+  * Cache path. Used for pre-load data and add updates.
     - `${filename}_pairs.bin`
     - `${filename}_tokens.bin`
     - `${filename}_p2tt.bin`
   * Type: `string`
   * Default: *OS cache folder*
-- `csv`
-  * Switch cache between CSV and binary via [DEX DB](https://github.com/calp-pro/dex_db)
-  * Type: `boolean`
-  * Default: `true`
 - `factory`
   * Smart contract factory address.
   * Type: `string`
@@ -115,11 +111,9 @@ The loader automatically identifies the optimal persistent storage path for your
 - **macOS:** `~/Library/Caches/`
 - **Windows:** `%LOCALAPPDATA%` or `AppData/Local/`
 
-There are binary compact cache or CSV.<br>
 Binary cache done via [DEX DB](https://github.com/calp-pro/dex_db)
 
 Cache files are named following the pattern:
-- `${package_name}_{factory_address}.csv`
 - `${package_name}_{factory_address}_pairs.bin`
 - `${package_name}_{factory_address}_tokens.bin`
 - `${package_name}_{factory_address}_p2tt.bin`

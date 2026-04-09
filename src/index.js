@@ -100,17 +100,21 @@ const load = (params = {}) => {
             }
         )
     ).then(last_id => {
-        const start_loading_from = pairs.length
-            ? Math.max(from, pairs[pairs.length - 1].id + 1)
-            : from
+        var start_loading_from = 0
+        if (fs.existsSync(filename + '_tokens_ids.bin')) {
+            buf = fs.readFileSync(filename + '_tokens_ids.bin')
+            for (let i = 0; i < buf.length; i += 4) {
+                var id = buf.readUInt32LE(i)
+                if (id == 0 || id == undefined) break
+                start_loading_from++
+            }
+        }
 
-        var next_pair_order = pairs.length
-            ? pairs[pairs.length - 1].id + 1
-            : 0
+        var next_pair_order = start_loading_from
 
         if (progress)
             for (var i = from; i < start_loading_from; i++)
-                progress(pairs[i].id, last_id + 1, pairs[i])
+                progress(i, last_id + 1)
         
         const onpair = csv
             ? pair => {
@@ -135,7 +139,6 @@ const load = (params = {}) => {
         const indexes = []
         for (var i = start_loading_from; i <= last_id; i++)
             indexes.push(i)
-
         return require('./loader')({
             indexes,
             factory: uniswap_v3_factory,

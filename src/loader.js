@@ -3,40 +3,63 @@ const npm = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
 var buf
 const IDS = []
 
-function get_tokens_ids_by_indexes(filename, indexes) {
-    const indexes_load = indexes.filter(_ => !IDS[_])
+function get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal) {//result is map between index and id
+    const indexes_load = []
+    for (var i = 0, index; i < indexes.length; i++) {
+        index = indexes[i]
+        if (IDS[index])
+            result.set(index, IDS[index])
+        else 
+            indexes_load.push(index)
+    }
 
-    return indexes_load.length == 0
-        ? Promise.resolve(indexes.map(_ => IDS[_]))
-        : fetch(
-            'https://eth-mainnet.g.alchemy.com/v2/euEV_WdPWxmaSWLlGyKr9',
-            {
-                method:'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(
-                    indexes_load.map(index => ({
-                        jsonrpc:'2.0',
-                        id: index,
-                        method:'eth_call',
-                        params: [{
-                            to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
-                            data: '0x4f6ccce7' + index.toString(16).padStart(64,'0')
-                        }, 'latest']
-                    }))
-                )
+    if (indexes_load.length == 0) {
+        buf = Buffer.alloc(IDS.length * 4)
+        IDS.forEach((id, i) => buf.writeUInt32LE(id, i * 4))
+        fs.writeFileSync(filename + '_tokens_ids.bin', buf)
+        return Promise.resolve(result)
+    }
+    
+    return fetch(
+        'https://eth-mainnet.g.alchemy.com/v2/' + key,
+        {
+            method:'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+                indexes_load.map(index => ({
+                    jsonrpc:'2.0',
+                    id: index,
+                    method:'eth_call',
+                    params: [{
+                        to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+                        data: '0x4f6ccce7' + index.toString(16).padStart(64,'0')
+                    }, 'latest']
+                }))
+            )
+        }
+    )
+    .then(
+        _ => {
+            if (_.ok) return _.json()
+            throw 'respond not ok'
+        },
+        _ => {
+            throw _.cause?.message || 'failed fetch'
+        }
+    )    
+    .then(responds => {
+        const failed_indexes = indexes_load.filter(index => !responds.some(_ => _.id == index && _.result && !_.error))
+        responds.forEach(respond => {
+            if (typeof respond.id == 'number' && respond.result) {
+                IDS[respond.id] = parseInt(respond.result, 16)
+                if (isNaN(IDS[respond.id])) debugger
+                else result.set(respond.id, IDS[respond.id])
             }
-        )
-        .then(_ => _.json())
-        .then(_ => {
-            _.forEach(({id, result}) => {
-                IDS[id] = parseInt(result, 16)
-            })
-            buf = Buffer.alloc(IDS.length * 4)
-            IDS.forEach((id, i) => buf.writeUInt32LE(id, i * 4))
-            fs.writeFileSync(filename + '_tokens_ids.bin', buf)
-            
-            return indexes.map(_ => IDS[_])
         })
+        
+        return get_tokens_ids_by_indexes(key, filename, failed_indexes, result, abort_signal)
+    })
+    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal)), 10000)))
 }
 
 const get_pairs = (key, factory, ids, result, abort_signal) => ids.length == 0
@@ -65,7 +88,7 @@ const get_pairs = (key, factory, ids, result, abort_signal) => ids.length == 0
         _ => {
             throw _.cause?.message || 'failed fetch'
         }
-    )    
+    )
     .then(responds => {
         const failed_ids = {}
         responds.forEach(respond =>
@@ -111,14 +134,16 @@ const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
 
         for (var i = 0; i < responds.length; i++) {
             var respond = responds[i]
-            if (respond.result)
-                result[respond.id] = {
-                    token0: '0x' + respond.result.slice(2 + 64 * 2, 2 + 64 * 3).slice(24),
-                    token1: '0x' + respond.result.slice(2 + 64 * 3, 2 + 64 * 4).slice(24),
-                    fee: Number('0x' + respond.result.slice(2 + 64 * 4, 2 + 64 * 5))
+            if (respond.result) {
+                const token0 = '0x' + respond.result.slice(2 + 64 * 2, 2 + 64 * 3).slice(24)
+                const token1 = '0x' + respond.result.slice(2 + 64 * 3, 2 + 64 * 4).slice(24)
+                const fee = Number('0x' + respond.result.slice(2 + 64 * 4, 2 + 64 * 5))
+                if (token0.length == 42 && token1.length == 42 && fee) {
+                    result[respond.id] = {token0, token1, fee}
+                    continue
                 }
-            else
-                failed_ids.push(respond.id)
+            }
+            failed_ids.push(respond.id)
         }
 
         return failed_ids.length == 0
@@ -143,11 +168,11 @@ const main = ({indexes, factory, key, multicall_size, abort_signal, filename}, o
 
     return chunks.reduce((p, indexes, ic) =>
         p.then(() =>
-            get_tokens_ids_by_indexes(filename, indexes).then(tokens_ids =>
-                get_tokens(key, tokens_ids, {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
+            get_tokens_ids_by_indexes(key, filename, indexes, new Map(), abort_signal).then(tokens_ids =>
+                get_tokens(key, [...tokens_ids.values()], {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
                     get_pairs(key, factory, tokens, {}, abort_signal).then(pairs =>
                         indexes.forEach((index, i) => {
-                            var id = tokens_ids[i]
+                            var id = tokens_ids.get(index)
                             onpair({
                                 id: index,
                                 pair: pairs[id],
