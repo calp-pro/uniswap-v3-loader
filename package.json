@@ -45,6 +45,6 @@
     "provenance": true
   },
   "dependencies": {
-    "@calp-pro/dex-db": "^2.0.4"
+    "@calp-pro/dex-db": "3.0.1"
   }
 }

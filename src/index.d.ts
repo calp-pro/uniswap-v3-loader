@@ -32,8 +32,6 @@ export interface load_params {
   to?: number
   /** Progress callback. */
   progress?: (current: number, total: number) => void
-  /** Number of worker threads to use. Set to 0 to run in the main thread. */
-  workers?: number
   /** Existing pairs to start with (used for updates). */
   pairs?: pair[]
   /** Timeout between updates in milliseconds. */

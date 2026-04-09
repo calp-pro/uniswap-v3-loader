@@ -9,7 +9,6 @@ const options = [
     'multicall_size',
     'from',
     'to',
-    'workers',
 ]
 
 const params = {}
@@ -40,13 +39,6 @@ while (arg = process.argv[i]) {
 		value = Number(value)
 		if (isNaN(value) || value < 0 || !Number.isInteger(value)) {
             console.log(`"${option}" should be a numeric position index NonfungiblePositionManager.`)
-			process.exit(22)
-		}
-	}
-	if (option == 'workers') {
-		value = Number(value)
-		if (isNaN(value) || value < 0 || !Number.isInteger(value)) {
-			console.log(`"workers" should be a numeric and positive integer.`)
 			process.exit(22)
 		}
 	}

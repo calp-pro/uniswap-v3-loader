@@ -135,6 +135,7 @@ const load = (params = {}) => {
         const indexes = []
         for (var i = start_loading_from; i <= last_id; i++)
             indexes.push(i)
+
         return require('./loader')({
             indexes,
             factory: uniswap_v3_factory,
