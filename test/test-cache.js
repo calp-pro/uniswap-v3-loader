@@ -23,14 +23,14 @@ describe('Cache OS filename at win32', () => {
         process.env.APPDATA = 'cache'
         assert.equal(
             default_cache_filename(uniswap_v3_factory),
-            'cache/uniswap-v2-loader_0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
+            'cache/uniswap-v3-loader_0x1f98431c8ad98523631ae4a59f267346ea31f984'
         )
     })
     it('win32 & LOCALAPPDATA', () => {
         process.env.LOCALAPPDATA = 'cache'
         assert.equal(
             default_cache_filename(uniswap_v3_factory),
-            'cache/uniswap-v3-loader_0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
+            'cache/uniswap-v3-loader_0x1f98431c8ad98523631ae4a59f267346ea31f984'
         )
     })
 
