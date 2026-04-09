@@ -8,7 +8,11 @@ fetch(
             id:1,
             method:'eth_call',
             params:[
-                { to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88', data: '0x18160ddd' }, 'latest'
+                {
+                    to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+                    data: '0x18160ddd'
+                },
+                'latest'
             ]
         })
     })

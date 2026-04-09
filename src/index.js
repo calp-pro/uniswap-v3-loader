@@ -1,11 +1,9 @@
-const cluster = require('cluster')
 const fs = require('fs')
-const os = require('os')
 const path = require('path')
 const default_cache_filename = require('./default_cache_filename')
 const dex_db = require('@calp-pro/dex-db')
-const max_workers = os.cpus().length - 1
 const debug_key = process.env.KEY || 'euEV_WdPWxmaSWLlGyKr9'
+const uniswap_v3_factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
 
 const load = (params = {}) => {
     var {
@@ -17,7 +15,6 @@ const load = (params = {}) => {
         to,
         progress,
         abort_signal,
-        workers = max_workers,
         pairs,
     } = params
 
@@ -25,8 +22,7 @@ const load = (params = {}) => {
         filename = default_cache_filename(uniswap_v3_factory)
         if (csv) filename += '.csv'
     }
-    workers = Math.min(workers, max_workers)
-    
+
     var db
     
     if (!pairs) {
@@ -131,54 +127,30 @@ const load = (params = {}) => {
                 if (progress && pair.id >= from) progress(pair.id, last_id + 1, pair)
                 var _
                 while (_ = pairs[next_pair_order]) {
-                    db.index_save([_.pair, _.token0, _.token1], filename)
+                    db.index_save(_.pair, _.token0, _.token1, filename)
                     next_pair_order++
                 }
             }
 
-        if (!workers) {
-            const ids = []
-            for (var i = start_loading_from; i <= last_id; i++)
-                ids.push(i)
-            return require('./loader')({ ids, key, multicall_size, abort_signal }, onpair)
-            .then(() => {
-                if (from && to) return pairs.filter(({id}) => id >= from && id <= to)
-                if (from) return pairs.filter(({id}) => id >= from)
-                if (to) return pairs.filter(({id}) => id <= to)
-                return pairs
-            })
-        }
-
-        const missed = Array(workers).fill(null).map(() => [])
-
-        for (var i = start_loading_from, iw = 0; i <= last_id; i++)
-            missed[iw++ % workers].push(i)
-        
-        cluster.setupPrimary({ exec: path.join(__dirname, 'loader.js') })
-        
-        return Promise.all(
-            missed
-            .filter(_ => _.length)
-            .map((ids, i) => new Promise(y => {
-                if (abort_signal?.aborted) return y()
-                const w = cluster.fork()
-                const onabort = () => w.send('abort')
-                abort_signal?.addEventListener('abort', onabort, { once: true })
-                w.send({ ids, factory: uniswap_v3_factory, key, multicall_size })
-                w.on('message', onpair)
-                w.on('exit', () => {
-                    abort_signal?.removeEventListener('abort', onabort)
-                    y()
-                })
-            }))
-        ).then(() => {
+        const indexes = []
+        for (var i = start_loading_from; i <= last_id; i++)
+            indexes.push(i)
+        return require('./loader')({
+            indexes,
+            factory: uniswap_v3_factory,
+            key,
+            multicall_size,
+            abort_signal,
+            filename: csv ? filename.replace('.csv', '') : filename
+        }, onpair)
+        .then(() => {
             if (from && to) return pairs.filter(({id}) => id >= from && id <= to)
             if (from) return pairs.filter(({id}) => id >= from)
             if (to) return pairs.filter(({id}) => id <= to)
             return pairs
         })
     })
-    .catch(() => abort_signal?.aborted ? pairs : new Promise(resolve => setTimeout(() => resolve(load(params)), 1000)))
+    .catch(e => abort_signal?.aborted ? pairs : new Promise(resolve => setTimeout(() => resolve(load(params)), 1000)))
 }
 
 module.exports.load = (params = {}) =>

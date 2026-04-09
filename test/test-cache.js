@@ -3,7 +3,7 @@ const { describe, before, after, it } = require('node:test')
 const assert = require('node:assert/strict')
 const {load, subscribe} = require('../src/index')
 const default_cache_filename = require('../src/default_cache_filename')
-const uniswap_v2_factory = '0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
+const uniswap_v3_factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
 
 describe('Cache OS filename at win32', () => {
     const platform = process.platform
@@ -16,21 +16,21 @@ describe('Cache OS filename at win32', () => {
     })
     
     it('win32', () => {
-        const expected = path.join(os.homedir(), 'AppData', 'Local', `uniswap-v2-loader_${uniswap_v2_factory}`)
-        assert.equal(default_cache_filename(uniswap_v2_factory), expected)
+        const expected = path.join(os.homedir(), 'AppData', 'Local', `uniswap-v3-loader_${uniswap_v3_factory}`)
+        assert.equal(default_cache_filename(uniswap_v3_factory), expected)
     })
     it('win32 & APPDATA', () => {
         process.env.APPDATA = 'cache'
         assert.equal(
-            default_cache_filename(uniswap_v2_factory),
+            default_cache_filename(uniswap_v3_factory),
             'cache/uniswap-v2-loader_0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
         )
     })
     it('win32 & LOCALAPPDATA', () => {
         process.env.LOCALAPPDATA = 'cache'
         assert.equal(
-            default_cache_filename(uniswap_v2_factory),
-            'cache/uniswap-v2-loader_0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
+            default_cache_filename(uniswap_v3_factory),
+            'cache/uniswap-v3-loader_0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f'
         )
     })
 
@@ -39,8 +39,8 @@ describe('Cache OS filename at win32', () => {
         fs.existsSync = p => p.endsWith('.cache')
         Object.defineProperty(process, 'platform', {value: 'linux', configurable: true})
         process.env.XDG_CACHE_HOME = ''
-        const expected = path.join(os.homedir(), '.cache', `uniswap-v2-loader_${uniswap_v2_factory}`)
-        assert.equal(default_cache_filename(uniswap_v2_factory), expected)
+        const expected = path.join(os.homedir(), '.cache', `uniswap-v3-loader_${uniswap_v3_factory}`)
+        assert.equal(default_cache_filename(uniswap_v3_factory), expected)
         fs.existsSync = exists_sync
     })
 
@@ -50,8 +50,8 @@ describe('Cache OS filename at win32', () => {
         Object.defineProperty(process, 'platform', {value: 'linux', configurable: true})
         process.env.XDG_CACHE_HOME = ''
         
-        const expected = path.join(os.tmpdir(), `uniswap-v2-loader_${uniswap_v2_factory}`)
-        assert.equal(default_cache_filename(uniswap_v2_factory), expected)
+        const expected = path.join(os.tmpdir(), `uniswap-v3-loader_${uniswap_v3_factory}`)
+        assert.equal(default_cache_filename(uniswap_v3_factory), expected)
         fs.existsSync = exists_sync
     })
     
@@ -72,8 +72,8 @@ describe('Cache OS filename at darwin', () => {
     })
     
     it('darwin', () => {
-        const expected = path.join(os.homedir(), 'Library', 'Caches', `uniswap-v2-loader_${uniswap_v2_factory}`)
-        assert.equal(default_cache_filename(uniswap_v2_factory), expected)
+        const expected = path.join(os.homedir(), 'Library', 'Caches', `uniswap-v3-loader_${uniswap_v3_factory}`)
+        assert.equal(default_cache_filename(uniswap_v3_factory), expected)
     })
     
     after(() => {
@@ -98,8 +98,8 @@ describe('Cache OS filename at linux', () => {
         const cache_dir = path.join(os.homedir(), '.cache')
         fs.existsSync = p => p === cache_dir
         process.env.XDG_CACHE_HOME = cache_dir
-        const expected = path.join(cache_dir, `uniswap-v2-loader_${uniswap_v2_factory}`)
-        assert.equal(default_cache_filename(uniswap_v2_factory), expected)
+        const expected = path.join(cache_dir, `uniswap-v3-loader_${uniswap_v3_factory}`)
+        assert.equal(default_cache_filename(uniswap_v3_factory), expected)
         fs.existsSync = exists_sync
     })
     

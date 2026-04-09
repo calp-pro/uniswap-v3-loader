@@ -20,16 +20,13 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
-        node-version: '22'
+        node-version: '24'
         registry-url: 'https://registry.npmjs.org'
-
-    - name: Update npm
-      run: npm install -g npm@latest
 
     - name: Install dependencies
       run: npm i
@@ -37,8 +34,8 @@ jobs:
     - name: Global install package CLI version
       run: npm i -g .
 
-    - name: Test CLI load first 4 pairs from Uniswap V3 using 2 workers
-      run: uniswap-v3-loader --to=3 --multicall_size=2 --workers=2
+    - name: Test CLI load first 4 pairs from Uniswap V3 using 2 multicalls
+      run: uniswap-v3-loader --to=3 --multicall_size=2
 
     - name: Run ESM tests
       run: npm run test-esm

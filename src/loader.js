@@ -1,8 +1,45 @@
-const factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
+const fs = require('fs')
 const npm = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
-const get_tokens_ids_by_indexes = require('./get_tokens_ids')
+var buf
+const IDS = []
 
-const get_pairs = (key, ids, result, abort_signal) => ids.length == 0
+function get_tokens_ids_by_indexes(filename, indexes) {
+    const indexes_load = indexes.filter(_ => !IDS[_])
+
+    return indexes_load.length == 0
+        ? Promise.resolve(indexes.map(_ => IDS[_]))
+        : fetch(
+            'https://eth-mainnet.g.alchemy.com/v2/euEV_WdPWxmaSWLlGyKr9',
+            {
+                method:'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(
+                    indexes_load.map(index => ({
+                        jsonrpc:'2.0',
+                        id: index,
+                        method:'eth_call',
+                        params: [{
+                            to: '0xC36442b4a4522E871399CD717aBDD847Ab11FE88',
+                            data: '0x4f6ccce7' + index.toString(16).padStart(64,'0')
+                        }, 'latest']
+                    }))
+                )
+            }
+        )
+        .then(_ => _.json())
+        .then(_ => {
+            _.forEach(({id, result}) => {
+                IDS[id] = parseInt(result, 16)
+            })
+            buf = Buffer.alloc(IDS.length * 4)
+            IDS.forEach((id, i) => buf.writeUInt32LE(id, i * 4))
+            fs.writeFileSync(filename + '_tokens_ids.bin', buf)
+            
+            return indexes.map(_ => IDS[_])
+        })
+}
+
+const get_pairs = (key, factory, ids, result, abort_signal) => ids.length == 0
     ? Promise.resolve([])
     : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
         signal: abort_signal,
@@ -39,10 +76,10 @@ const get_pairs = (key, ids, result, abort_signal) => ids.length == 0
         return Object.keys(failed_ids).length == 0
             ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_pairs(key, failed_ids, result, abort_signal)
+                get_pairs(key, factory, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs(key, ids, result, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs(key, factory, ids, result, abort_signal)), 10000)))
 
 const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
     ? Promise.resolve(result)
@@ -87,23 +124,30 @@ const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
         return failed_ids.length == 0
             ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_tokens_ids(key, failed_ids, result, abort_signal)
+                get_tokens(key, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens_ids(key, ids, result, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens(key, ids, result, abort_signal)), 10000)))
 
-const main = ({ids: indexes, key, multicall_size, abort_signal}, onpair) => {
+const main = ({indexes, factory, key, multicall_size, abort_signal, filename}, onpair) => {
+    if (fs.existsSync(filename + '_tokens_ids.bin')) {
+        buf = fs.readFileSync(filename + '_tokens_ids.bin')
+        for (let i = 0; i < buf.length; i += 4)
+            IDS.push(buf.readUInt32LE(i))
+    }
+
+    
     const chunks = []
     for (let i = 0; i < indexes.length; i += multicall_size)
         chunks.push(indexes.slice(i, i + multicall_size))
 
     return chunks.reduce((p, indexes, ic) =>
         p.then(() =>
-            get_tokens_ids_by_indexes(indexes).then(tokens_ids =>
+            get_tokens_ids_by_indexes(filename, indexes).then(tokens_ids =>
                 get_tokens(key, tokens_ids, {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
-                    get_pairs(key, tokens, {}, abort_signal).then(pairs =>
-                        indexes.forEach(index => {
-                            var id = tokens_ids[index]
+                    get_pairs(key, factory, tokens, {}, abort_signal).then(pairs =>
+                        indexes.forEach((index, i) => {
+                            var id = tokens_ids[i]
                             onpair({
                                 id: index,
                                 pair: pairs[id],
