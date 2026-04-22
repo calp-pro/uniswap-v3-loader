@@ -16,8 +16,8 @@ export interface pair {
  * Parameters for the load function.
  */
 export interface load_params {
-  /** Alchemy API key. */
-  key?: string
+  /** RPC URL for Ethereum node (Alchemy,QuickNode,Anrk,ect.). */
+  RPC_URL?: string
   /** The address of a Uniswap V3 factory. */
   factory?: string
   /** Path to the cache file. Set to null to disable caching. */

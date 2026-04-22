@@ -2,15 +2,16 @@ const fs = require('fs')
 const path = require('path')
 const default_cache_filename = require('./default_cache_filename')
 const dex_db = require('@calp-pro/dex-db')
-const debug_key = process.env.KEY || 'euEV_WdPWxmaSWLlGyKr9'
+const debug_key = process.env.KEY || 'wu1lvrGhpFjbPohdUWcEd'//'lpa8F3WnL8XBb5xQVKgel'
 const uniswap_v3_factory = '0x1f98431c8ad98523631ae4a59f267346ea31f984'
+const get_ALCHEMY_URL = key => 'https://eth-mainnet.g.alchemy.com/v2/' + key
 
 const load = (params = {}) => {
     var {
-        key = debug_key,
+        RPC_URL = get_ALCHEMY_URL(debug_key),
         filename,
         csv = true,
-        multicall_size = 50,
+        multicall_size = 80,
         from = 0,
         to,
         progress,
@@ -73,7 +74,7 @@ const load = (params = {}) => {
 
     return (to
         ? Promise.resolve(to)
-        : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
+        : fetch(RPC_URL, {
             signal: abort_signal,
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -115,7 +116,7 @@ const load = (params = {}) => {
         if (progress)
             for (var i = from; i < start_loading_from; i++)
                 progress(i, last_id + 1)
-        
+        var count_pairs = db.get_all_pairs().length
         const onpair = csv
             ? pair => {
                 pairs[pair.id] = pair
@@ -128,10 +129,12 @@ const load = (params = {}) => {
             }
             : pair => {
                 pairs[pair.id] = pair
-                if (progress && pair.id >= from) progress(pair.id, last_id + 1, pair)
+                if (progress && pair.id >= from) progress(pair.id, last_id + 1, pair, count_pairs)
                 var _
                 while (_ = pairs[next_pair_order]) {
                     db.index_save(_.pair, _.token0, _.token1, filename)
+                    if (pair.id % 100 == 0)
+                        count_pairs = db.get_all_pairs().length
                     next_pair_order++
                 }
             }
@@ -142,7 +145,7 @@ const load = (params = {}) => {
         return require('./loader')({
             indexes,
             factory: uniswap_v3_factory,
-            key,
+            RPC_URL,
             multicall_size,
             abort_signal,
             filename: csv ? filename.replace('.csv', '') : filename

@@ -53,10 +53,10 @@ Methods:
   * Smart contract factory address.
   * Type: `string`
   * Default: `0x1f98431c8ad98523631ae4a59f267346ea31f984`
-- `key`
-  * Alchemy API Key
+- `RPC_URL`
+  * Any RCP URL from Alchemy,Ankr,QuickNode,etc.
   * Type: `string`
-  *  Default: `FZBvlPrOxtgaKBBkry3SH0W1IqH4Y5tu`
+  *  Default: `https://eth-mainnet.g.alchemy.com/v2/FZBvlPrOxtgaKBBkry3SH0W1IqH4Y5tu`
 - `multicall_size`
   * RPC batch size per multicall request.
   * Type:`number`

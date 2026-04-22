@@ -3,7 +3,7 @@ const npm = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88'
 var buf
 const IDS = []
 
-function get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal) {//result is map between index and id
+function get_tokens_ids_by_indexes(RPC_URL, filename, indexes, result, abort_signal) {//result is map between index and id
     const indexes_load = []
     for (var i = 0, index; i < indexes.length; i++) {
         index = indexes[i]
@@ -21,7 +21,7 @@ function get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal)
     }
     
     return fetch(
-        'https://eth-mainnet.g.alchemy.com/v2/' + key,
+        RPC_URL,
         {
             method:'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -57,14 +57,14 @@ function get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal)
             }
         })
         
-        return get_tokens_ids_by_indexes(key, filename, failed_indexes, result, abort_signal)
+        return get_tokens_ids_by_indexes(RPC_URL, filename, failed_indexes, result, abort_signal)
     })
-    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_tokens_ids_by_indexes(key, filename, indexes, result, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_tokens_ids_by_indexes(RPC_URL, filename, indexes, result, abort_signal)), 10000)))
 }
 
-const get_pairs = (key, factory, ids, result, abort_signal) => ids.length == 0
+const get_pairs = (RPC_URL, factory, ids, result, abort_signal) => ids.length == 0
     ? Promise.resolve([])
-    : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
+    : fetch(RPC_URL, {
         signal: abort_signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,14 +99,14 @@ const get_pairs = (key, factory, ids, result, abort_signal) => ids.length == 0
         return Object.keys(failed_ids).length == 0
             ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_pairs(key, factory, failed_ids, result, abort_signal)
+                get_pairs(RPC_URL, factory, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs(key, factory, ids, result, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? [] : new Promise(resolve => setTimeout(() => resolve(get_pairs(RPC_URL, factory, ids, result, abort_signal)), 10000)))
 
-const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
+const get_tokens = (RPC_URL, ids, result, abort_signal) => ids.length == 0
     ? Promise.resolve(result)
-    : fetch('https://eth-mainnet.g.alchemy.com/v2/' + key, {
+    : fetch(RPC_URL, {
         signal: abort_signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,12 +149,12 @@ const get_tokens = (key, ids, result, abort_signal) => ids.length == 0
         return failed_ids.length == 0
             ? result
             : new Promise(resolve => setTimeout(() => resolve(
-                get_tokens(key, failed_ids, result, abort_signal)
+                get_tokens(RPC_URL, failed_ids, result, abort_signal)
             ), 10000))
     })
-    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens(key, ids, result, abort_signal)), 10000)))
+    .catch(() => abort_signal?.aborted ? {} : new Promise(resolve => setTimeout(() => resolve(get_tokens(RPC_URL, ids, result, abort_signal)), 10000)))
 
-const main = ({indexes, factory, key, multicall_size, abort_signal, filename}, onpair) => {
+const main = ({indexes, factory, RPC_URL, multicall_size, abort_signal, filename}, onpair) => {
     if (fs.existsSync(filename + '_tokens_ids.bin')) {
         buf = fs.readFileSync(filename + '_tokens_ids.bin')
         for (let i = 0; i < buf.length; i += 4)
@@ -167,10 +167,12 @@ const main = ({indexes, factory, key, multicall_size, abort_signal, filename}, o
         chunks.push(indexes.slice(i, i + multicall_size))
 
     return chunks.reduce((p, indexes, ic) =>
-        p.then(() =>
-            get_tokens_ids_by_indexes(key, filename, indexes, new Map(), abort_signal).then(tokens_ids =>
-                get_tokens(key, [...tokens_ids.values()], {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
-                    get_pairs(key, factory, tokens, {}, abort_signal).then(pairs =>
+        p
+        .then(() => new Promise(y => setTimeout(y, 3000)))
+        .then(() =>
+            get_tokens_ids_by_indexes(RPC_URL, filename, indexes, new Map(), abort_signal).then(tokens_ids =>
+                get_tokens(RPC_URL, [...tokens_ids.values()], {}, abort_signal).then(tokens => //where tokens = {23: {token0: 0x.., token1: 0x, fee: 2500}, }
+                    get_pairs(RPC_URL, factory, tokens, {}, abort_signal).then(pairs =>
                         indexes.forEach((index, i) => {
                             var id = tokens_ids.get(index)
                             onpair({
